@@ -13,8 +13,8 @@ envs = []
 res = []
 horizontal = []
 
-Threshold = 800
-taskAmount= 1000
+Threshold = 500
+taskAmount= 30000
 #lifeTime_fog = 0
 #lifeTime_cloud = 0
 
@@ -25,7 +25,7 @@ def TaskGenerator(env, num, pipe):
 	for i in range(1,num):
 		yield env.timeout(1)#gap between two succesive tasks
 		name = 'Task %d'%(i)
-		dataSize = random.randint(800,1000)
+		dataSize = random.randint(800,2000)
 		computationCost = random.randint(500,800)
 		TaskType = random.choice(Types)
 		TimeStamp = env.now 
@@ -37,17 +37,17 @@ def TaskGenerator(env, num, pipe):
 def data_transfer(env, pipe, pipe_fog, pipe_cloud, threshold):
 
 	while True:
-		BandWidth = 150
+		BandWidth = 3
 		task = yield pipe.get()
 		computationCost = task['ComputationCost']
 		dataSize = task['DataSize']
 
 		if computationCost>threshold:
-			task['TimeStamp'] = task['TimeStamp']-dataSize/10
+			task['TimeStamp'] = task['TimeStamp']-dataSize*10
 			yield env.timeout(dataSize/BandWidth)
 			yield pipe_cloud.put(task)
 		else:
-			task['TimeStamp'] = task['TimeStamp'] - dataSize/100
+			task['TimeStamp'] = task['TimeStamp'] - dataSize
 			yield env.timeout(dataSize/BandWidth)
 			#print env.now
 			yield pipe_fog.put(task)
@@ -60,7 +60,7 @@ def cloud(env, pipe_cloud):
 
 	while True:
 		task = yield pipe_cloud.get()
-		compTime = task['ComputationCost']*0.8
+		compTime = task['ComputationCost']*1
 		yield env.timeout(compTime)
 		lifeTime_cloud = lifeTime_cloud + (env.now - task['TimeStamp'])
 
@@ -75,7 +75,7 @@ def fog(env, pipe_fog):
 		yield env.timeout(compTime)
 		lifeTime_fog = lifeTime_fog+(env.now - task['TimeStamp'])
 
-for i in range(1,42):
+for i in range(1,22):
 	envs.append(simpy.Environment())
 
 #index = 0
@@ -93,11 +93,11 @@ for e in envs:
     e.run(until=100000000)
     print 'Total time spent is %.2f for processing %d tasks'%((lifeTime_fog+lifeTime_cloud)/10000000 , taskAmount)
     print 'Threshold is %d'%(Threshold)
-    #Threshold = Threshold +15
     res.append(lifeTime_fog+lifeTime_cloud)
-    horizontal.append(taskAmount)
-    taskAmount = taskAmount + 500
+    horizontal.append(Threshold)
+    #taskAmount = taskAmount + 500
     #index = index +1
+    Threshold = Threshold + 15
 
 plt.plot(horizontal,res)
 plt.show()
