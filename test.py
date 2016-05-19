@@ -1,7 +1,9 @@
 import simpy
 import random
 import matplotlib.pyplot as plt 
-
+"""
+Tasks are to processed on a homogenous system
+"""
 Types = ['Streaming', 'ImageProcessing', 'Computation']#task types
 
 env = simpy.Environment()#running environmrnt
@@ -13,20 +15,22 @@ envs = []
 res = []
 horizontal = []
 
-Threshold = 500
-taskAmount= 30000
+Threshold = 15000
+taskAmount= 1000
 #lifeTime_fog = 0
 #lifeTime_cloud = 0
+
+makespan = 0
 
 def TaskGenerator(env, num, pipe):
 
 	"""Tasks generated from things"""
 
 	for i in range(1,num):
-		yield env.timeout(1)#gap between two succesive tasks
+		yield env.timeout(5)#gap between two succesive tasks
 		name = 'Task %d'%(i)
-		dataSize = random.randint(800,2000)
-		computationCost = random.randint(500,800)
+		dataSize = random.randint(8000,15000)
+		computationCost = random.randint(15000,28000)
 		TaskType = random.choice(Types)
 		TimeStamp = env.now 
 
@@ -54,19 +58,24 @@ def data_transfer(env, pipe, pipe_fog, pipe_cloud, threshold):
 
 		#yield env.timeout(dataSize/BandWidth)
 
-def cloud(env, pipe_cloud):
+def cloud(env, pipe_cloud, num):
 
 	global lifeTime_cloud
+	global makespan
 
 	while True:
 		task = yield pipe_cloud.get()
 		compTime = task['ComputationCost']*1
 		yield env.timeout(compTime)
 		lifeTime_cloud = lifeTime_cloud + (env.now - task['TimeStamp'])
+		name = task['Name']
+		if name=='Name %d'%(num-1):
+			makespan = env.now
 
-def fog(env, pipe_fog):
+def fog(env, pipe_fog, num):
 
 	global lifeTime_fog
+	global makespan
 
 	while True:
 		task = yield pipe_fog.get()
@@ -74,30 +83,37 @@ def fog(env, pipe_fog):
 		gap = env.now - task['TimeStamp']
 		yield env.timeout(compTime)
 		lifeTime_fog = lifeTime_fog+(env.now - task['TimeStamp'])
+		if task['Name']=='Name %d'%(num-1):
+			makespan = env.now
+			
 
-for i in range(1,22):
+for i in range(1,88):
 	envs.append(simpy.Environment())
 
 #index = 0
 
 for e in envs:
-    lifeTime_fog = 0 
-    lifeTime_cloud =0
-    pipe = simpy.Store(e)
-    pipe_fog = simpy.Store(e)
-    pipe_cloud = simpy.Store(e)
-    e.process(TaskGenerator(e, taskAmount, pipe))
-    e.process(data_transfer(e, pipe, pipe_fog, pipe_cloud,Threshold))
-    e.process(fog(e, pipe_fog))
-    e.process(cloud(e, pipe_cloud))
-    e.run(until=100000000)
-    print 'Total time spent is %.2f for processing %d tasks'%((lifeTime_fog+lifeTime_cloud)/10000000 , taskAmount)
-    print 'Threshold is %d'%(Threshold)
-    res.append(lifeTime_fog+lifeTime_cloud)
-    horizontal.append(Threshold)
-    #taskAmount = taskAmount + 500
+	makespan = 0
+	lifeTime_fog = 0
+	lifeTime_cloud =0
+	pipe = simpy.Store(e)
+	pipe_fog = simpy.Store(e)
+	pipe_cloud = simpy.Store(e)
+	e.process(TaskGenerator(e, taskAmount, pipe))
+	e.process(data_transfer(e, pipe, pipe_fog, pipe_cloud,Threshold))
+	p1 = e.process(fog(e, pipe_fog,taskAmount))
+	p2 = e.process(fog(e, pipe_fog,taskAmount))
+	p3 = e.process(fog(e, pipe_fog,taskAmount))
+	p4 = e.process(fog(e, pipe_fog,taskAmount))
+	e.process(cloud(e, pipe_cloud,taskAmount))
+	e.run(until=None)
+	print 'Total makespan is %.2f for processing this applicatino of %d tasks'%((e.now)/10000, taskAmount)
+	print 'Threshold is %d'%(Threshold)
+	res.append(e.now)
+	horizontal.append(Threshold)
+	Threshold = Threshold + 150
+	#taskAmount = taskAmount + 500
     #index = index +1
-    Threshold = Threshold + 15
 
 plt.plot(horizontal,res)
 plt.show()
